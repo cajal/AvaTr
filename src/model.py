@@ -1,5 +1,5 @@
 import torch
-import torch.nn import nn
+import torch.nn as nn
 import random
 import os
 import soundfile as sf
@@ -66,15 +66,17 @@ class AvaTr(nn.Module):
         enc_activation="relu",
         fb_name="free",
         kernel_size=16,
-        n_filters=64,
+        n_filters=128,
         stride=8,
         **fb_kwargs,
     ):
+        super(AvaTr, self).__init__()
+
         self.encoder, self.decoder = make_enc_dec(
             fb_name, kernel_size=kernel_size, n_filters=n_filters, stride=stride, **fb_kwargs
         )
 
-        n_feats = encoder.n_feats_out
+        n_feats = self.encoder.n_feats_out
         if in_chan is not None:
             assert in_chan == n_feats, (
                 "Number of filterbank output channels"
@@ -131,16 +133,3 @@ class AvaTr(nn.Module):
         out_wavs = pad_x_to_y(self.decoder(masked_rep), wav)
 
         return out_wavs.squeeze(1)
-
-
-if __name__ == '__main__':
-    device = torch.device('cuda:3')
-
-    # Model
-    model = AvaTr(n_spk=10)
-    model = model.to(device)
-
-    mix = torch.rand(2, 24000)
-    spk_id = torch.LongTensor([1, 8])
-    mix, spk_id = mix.to(device), spk_id.to(device)
-    est = model(mix, spk_id)

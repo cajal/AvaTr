@@ -23,20 +23,18 @@ class SigmoidDotAttention(nn.Module):
 
         b, c, s = sequence.shape
 
-        sequence = sequence.transpose(1, 2).reshape(b*s, c)
-        sequence = self.sequence_linear(sequence)
-        sequence = sequence.reshape(b, s, -1)
+        sequence = sequence.transpose(1, 2)
+        sequence = self.sequence_linear(sequence) # b, s, dim
 
         q = self.embedding_linear(ava_emb).unsqueeze(-1)
 
-        # (batch, seq_len, dim) * (batch, dim, 1) -> (batch, seq_len, 1)
+        # (b, s, dim) * (b, dim, 1) -> (b, s, 1)
         attn = torch.bmm(sequence, q)
-
-        attn = torch.sigmoid(attn).view(b, -1, s)
+        attn = torch.sigmoid(attn)
 
         output = sequence * attn
 
-        return output, attn
+        return output.transpose(1, 2), attn
 
 
 class Modulator(nn.Module):
@@ -44,15 +42,17 @@ class Modulator(nn.Module):
 
     Args:
         n_spk (int): number of speakers
-        embed_dim (int): size of avatar embedding
         feat_dim (int): size of mixture feature
+        embed_dim (int): size of avatar embedding
     Inputs:
         mixture_feature (B, C, T): feature of the mixed audio
         spk_id (B, embed_dim): speaker id
     Outputs:
         mixture_feature (B, C, T): modulated feature
     """
-    def __init__(self, n_spk, embed_dim, feat_dim):
+    def __init__(self, n_spk, feat_dim, embed_dim):
+        super(Modulator, self).__init__()
+
         self.avatar = nn.Embedding(n_spk, embed_dim)
         self.att = SigmoidDotAttention(feat_dim, embed_dim)
 

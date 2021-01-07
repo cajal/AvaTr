@@ -118,7 +118,6 @@ class DPTransformer(nn.Module):
         hop_size = hop_size if hop_size is not None else chunk_size // 2
         self.hop_size = hop_size
         self.n_repeats = n_repeats
-        self.n_src = n_src
         self.norm_type = norm_type
         self.ff_activation = ff_activation
         self.mask_act = mask_act
@@ -128,9 +127,14 @@ class DPTransformer(nn.Module):
         # Get activation function.
         if mask_act == 'relu':
             self.mask_act = nn.ReLU
-            self.ff_activation = nn.ReLU
         elif mask_act == 'sigmoid':
             self.mask_act = nn.Sigmoid
+        elif mask_act == 'softmax':
+            self.mask_act = nn.Softmax(dim=1)
+        else:
+            raise NotImplementedError
+
+        if ff_activation == 'relu':
             self.ff_activation = nn.ReLU
         else:
             raise NotImplementedError
@@ -185,12 +189,15 @@ class DPTransformer(nn.Module):
             )
 
         # Final layers
-        net_out_conv = nn.Conv2d(self.mha_in_dim, n_src * self.in_chan, 1)
-        self.first_out = nn.Sequential(nn.PReLU(), net_out_conv)
+        self.first_out = nn.Sequential(
+                            nn.PReLU(),
+                            nn.Conv2d(self.mha_in_dim, self.n_src * self.in_chan, 1)
+                            )
+
         # Gating and masking in 2D space (after fold)
         self.net_out = nn.Sequential(nn.Conv1d(self.in_chan, self.in_chan, 1), nn.Tanh())
         self.net_gate = nn.Sequential(nn.Conv1d(self.in_chan, self.in_chan, 1), nn.Sigmoid())
-        self.output_act = mask_nl_class()
+        self.output_act = self.mask_act()
 
     def forward(self, mixture_w):
         r"""Forward.
@@ -204,7 +211,7 @@ class DPTransformer(nn.Module):
         if self.input_layer is not None:
             mixture_w = self.input_layer(mixture_w.transpose(1, 2)).transpose(1, 2)
 
-        mixture_w = self.in_norm(mixture_w)  # [batch, bn_chan, n_frames]
+        mixture_w = self.in_norm(mixture_w) # (batch, mha_in_dim, n_frames)
         n_orig_frames = mixture_w.shape[-1]
 
         mixture_w = self.ola.unfold(mixture_w)
@@ -215,7 +222,7 @@ class DPTransformer(nn.Module):
             mixture_w = self.ola.intra_process(mixture_w, intra)
             mixture_w = self.ola.inter_process(mixture_w, inter)
 
-        output = self.first_out(mixture_w)
+        output = self.first_out(mixture_w) # (batch, in_chan * n_src, n_frames)
         output = output.reshape(batch * self.n_src, self.in_chan, self.chunk_size, n_chunks)
         output = self.ola.fold(output, output_size=n_orig_frames)
 

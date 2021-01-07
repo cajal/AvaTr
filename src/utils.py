@@ -141,7 +141,8 @@ class GlobLN(nn.Module):
     """Global Layer Normalization (globLN)."""
 
     def __init__(self, channel_size):
-        super(_LayerNorm, self).__init__()
+        super(GlobLN, self).__init__()
+
         self.channel_size = channel_size
         self.gamma = nn.Parameter(torch.ones(channel_size), requires_grad=True)
         self.beta = nn.Parameter(torch.zeros(channel_size), requires_grad=True)
@@ -150,7 +151,7 @@ class GlobLN(nn.Module):
         """ Assumes input of size `[batch, chanel, *]`. """
         return (self.gamma * normed_x.transpose(1, -1) + self.beta).transpose(1, -1)
 
-    def forward(self, x, EPS: float = 1e-8):
+    def forward(self, x, eps=1e-8):
         """Applies forward pass.
 
         Works for any input size > 2D.
@@ -161,11 +162,17 @@ class GlobLN(nn.Module):
         Returns:
             :class:`torch.Tensor`: gLN_x `[batch, chan, *]`
         """
-        def _glob_norm(x, eps: float = 1e-8):
-            dims: List[int] = torch.arange(1, len(x.shape)).tolist()
-            return z_norm(x, dims, eps)
+        def _z_norm(x, dims):
+            mean = x.mean(dim=dims, keepdim=True)
+            var2 = torch.var(x, dim=dims, keepdim=True, unbiased=False)
+            value = (x - mean) / torch.sqrt((var2 + eps))
+            return value
 
-        value = _glob_norm(x, eps=EPS)
+        def _glob_norm(x):
+            dims = torch.arange(1, len(x.shape)).tolist()
+            return _z_norm(x, dims)
+
+        value = _glob_norm(x)
         return self.apply_gain_and_bias(value)
 
 
