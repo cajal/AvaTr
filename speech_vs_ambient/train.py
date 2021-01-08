@@ -16,7 +16,7 @@ from asteroid.losses import SingleSrcNegSDR
 
 sys.path.append("../")
 
-from src.dataset import LibriMix
+from src.librimix_dataset import LibriMix
 from src.model import AvaTr
 
 
