@@ -8,10 +8,11 @@ import os
 
 
 class LibriMix(Dataset):
-    """" Dataset class for Librimix source separation tasks.
+    """" Dataset class for Librimix (subset) source separation tasks.
 
     Args:
-        csv_dir (str): The path to the metatdata file
+        root (str): The path to the dataset
+            default: ``'../datasets/Avatar10Mix2'``
         task (str): One of ``'enh_single'``, ``'enh_both'``, ``'sep_clean'`` or
             ``'sep_noisy'``.
 
@@ -44,21 +45,23 @@ class LibriMix(Dataset):
         # Get the csv corresponding to the task
         if task == "enh_single":
             flag = "%s_mix_single" % ("train" if is_training else "test")
-        elif task == "enh_both":
-            flag = "%s_mix_both" % ("train" if is_training else "test")
-            clean_flag = "%s_mix_clean" % ("train" if is_training else "test")
         elif task == "sep_clean":
             flag = "%s_mix_clean" % ("train" if is_training else "test")
         elif task == "sep_noisy":
             flag = "%s_mix_both" % ("train" if is_training else "test")
+        elif task == "enh_both":
+            flag = "%s_mix_both" % ("train" if is_training else "test")
+            clean_flag = "%s_mix_clean" % ("train" if is_training else "test")
+            md_clean_file = [f for f in os.listdir(csv_dir) if clean_flag in f and f.startswith("mix")][0]
+            self.df_clean = pd.read_csv(os.path.join(csv_dir, md_clean_file))
+        else:
+            raise ValueError("No such task!")
 
         md_file = [f for f in os.listdir(csv_dir) if flag in f and f.startswith("mix")][0]
-        md_clean_file = [f for f in os.listdir(csv_dir) if clean_flag in f and f.startswith("mix")][0]
         self.csv_path = os.path.join(csv_dir, md_file)
 
         # Data frame of mixtures
         self.df = pd.read_csv(self.csv_path)
-        self.df_clean = pd.read_csv(os.path.join(csv_dir, md_clean_file))
 
         # Get rid of the utterances too short
         if self.segment is not None:
@@ -157,8 +160,9 @@ class LibriMix(Dataset):
 
 
 if __name__ == '__main__':
-    csv_dir = 'data/wav8k/min/train-100-rand10-train'
-    dataset = LibriMix(csv_dir, task="enh_single", sample_rate=8000)
+    root = '../datasets/Avatar10Mix2'
+    dataset = LibriMix(root, task="enh_single", sample_rate=8000,
+                       segment=None, is_training=False)
 
     (mixture, spk_ids), sources = dataset[1]
     print(mixture.shape, sources.shape, spk_ids)
