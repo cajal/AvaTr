@@ -1,11 +1,10 @@
-# Filterbank config
-filterbank:
+filterbank: # Filterbank config
   n_filters: 128
   kernel_size: 16
   stride: 8
-# Network config
-masknet:
+separator: # Network config
   in_chan: 128
+  n_src: 1 # In enh_single, n_src = 1
   ff_hid: 256
   chunk_size: 100
   hop_size: 50
@@ -15,16 +14,18 @@ masknet:
   mask_act: 'sigmoid'
   bidirectional: true
   dropout: 0
-# Training config
-training:
+avatar: # Avatar config
+  n_spk: 10
+  emb_dim: 512
+training: # Training config
   epochs: 200
   batch_size: 4
   num_workers: 16
-  half_lr: yes
+  lr_scheduler: yes
   early_stop: yes
   gradient_clipping: 5
-# Optim config
-optim:
+  gpus: -1 # all gpus
+optim: # Optim config
   optimizer: adam
   lr: 0.001
   weight_decay: !!float 1e-5

@@ -1,44 +1,54 @@
 import os
 import argparse
 import json
+import sys
 
 import torch
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from asteroid import DPTNet
 from asteroid.engine import schedulers
-
-from asteroid.data.wham_dataset import WhamDataset
 from asteroid.engine.optimizers import make_optimizer
+from asteroid.engine.schedulers import DPTNetScheduler
 from asteroid.engine.system import System
-from asteroid.losses import PITLossWrapper, pairwise_neg_sisdr
+from asteroid.losses import SingleSrcNegSDR
 
-# Keys which are not in the conf.yml file can be added here.
-# In the hierarchical dictionary created when parsing, the key `key` can be
-# found at dic['main_args'][key]
+sys.path.append("../")
 
-# By default train.py will use all available GPUs. The `id` option in run.sh
-# will limit the number of available GPUs for train.py .
+from src.dataset import LibriMix
+from src.model import AvaTr
+
+
+# Additional arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_dir", default="exp/tmp", help="Full path to save best validation model")
 
 
 def main(conf):
-    train_set = WhamDataset(
+    # Just after instantiating, save the args. Easy loading in the future.
+    exp_dir = conf["main_args"]["exp_dir"]
+    os.makedirs(exp_dir, exist_ok=True)
+    conf_path = os.path.join(exp_dir, "conf.yml")
+    with open(conf_path, "w") as outfile:
+        yaml.safe_dump(conf, outfile)
+
+    # Data loaders
+    train_set = LibriMix(
         conf["data"]["train_dir"],
         conf["data"]["task"],
         sample_rate=conf["data"]["sample_rate"],
+        n_src=conf["data"]["n_src"],
         segment=conf["data"]["segment"],
-        nondefault_nsrc=conf["data"]["nondefault_nsrc"],
+        is_training=True
     )
-    val_set = WhamDataset(
+    val_set = LibriMix(
         conf["data"]["valid_dir"],
         conf["data"]["task"],
         sample_rate=conf["data"]["sample_rate"],
-        nondefault_nsrc=conf["data"]["nondefault_nsrc"],
+        n_src=conf["data"]["n_src"],
+        segment=conf["data"]["segment"],
+        is_training=False
     )
 
     train_loader = DataLoader(
@@ -55,40 +65,30 @@ def main(conf):
         num_workers=conf["training"]["num_workers"],
         drop_last=True,
     )
-    # Update number of source values (It depends on the task)
-    conf["masknet"].update({"n_src": train_set.n_src})
 
-    model = DPTNet(**conf["filterbank"], **conf["masknet"])
+    # Model
+    model = AvaTr(**conf["avatar"], **conf["separator"], **conf["filterbank"])
+
+    # Loss function
+    loss_func = SingleSrcNegSDR("sisdr", reduction='mean')
+
+    # Optimizer
     optimizer = make_optimizer(model.parameters(), **conf["optim"])
-    from asteroid.engine.schedulers import DPTNetScheduler
 
-    schedulers = {
-        "scheduler": DPTNetScheduler(
-            optimizer, len(train_loader) // conf["training"]["batch_size"], 64
-        ),
-        "interval": "step",
-    }
+    # lr scheduler
+    if conf["training"]["lr_scheduler"] == "plateau":
+        scheduler = ReduceLROnPlateau(optimizer=optimizer, factor=0.5, patience=30, verbose=True)
+    elif conf["training"]["lr_scheduler"] == "dpt":
+        schedulers = {
+            "scheduler": DPTNetScheduler(
+                optimizer, len(train_loader) // conf["training"]["batch_size"], 64
+            ),
+            "interval": "step",
+        }
+    else:
+        scheduler = None
 
-    # Just after instantiating, save the args. Easy loading in the future.
-    exp_dir = conf["main_args"]["exp_dir"]
-    os.makedirs(exp_dir, exist_ok=True)
-    conf_path = os.path.join(exp_dir, "conf.yml")
-    with open(conf_path, "w") as outfile:
-        yaml.safe_dump(conf, outfile)
-
-    # Define Loss function.
-    loss_func = PITLossWrapper(pairwise_neg_sisdr, pit_from="pw_mtx")
-    system = System(
-        model=model,
-        loss_func=loss_func,
-        optimizer=optimizer,
-        scheduler=schedulers,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        config=conf,
-    )
-
-    # Define callbacks
+    # Callbacks
     callbacks = []
     checkpoint_dir = os.path.join(exp_dir, "checkpoints/")
     checkpoint = ModelCheckpoint(
@@ -98,8 +98,17 @@ def main(conf):
     if conf["training"]["early_stop"]:
         callbacks.append(EarlyStopping(monitor="val_loss", mode="min", patience=30, verbose=True))
 
-    # Don't ask GPU if they are not available.
-    gpus = -1 if torch.cuda.is_available() else None
+    # Trainer
+    system = System(
+        model=model,
+        loss_func=loss_func,
+        optimizer=optimizer,
+        scheduler=schedulers,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        config=conf,
+    )
+    gpus = conf["training"]["gpus"] if torch.cuda.is_available() else None
     distributed_backend = "ddp" if torch.cuda.is_available() else None
     trainer = pl.Trainer(
         max_epochs=conf["training"]["epochs"],
@@ -109,8 +118,11 @@ def main(conf):
         distributed_backend=distributed_backend,
         gradient_clip_val=conf["training"]["gradient_clipping"],
     )
+
+    # Training
     trainer.fit(system)
 
+    # Save
     best_k = {k: v.item() for k, v in checkpoint.best_k_models.items()}
     with open(os.path.join(exp_dir, "best_k_models.json"), "w") as f:
         json.dump(best_k, f, indent=0)
@@ -120,7 +132,6 @@ def main(conf):
     system.cpu()
 
     to_save = system.model.serialize()
-    to_save.update(train_set.get_infos())
     torch.save(to_save, os.path.join(exp_dir, "best_model.pth"))
 
 
@@ -129,18 +140,11 @@ if __name__ == "__main__":
     from pprint import pprint
     from asteroid.utils import prepare_parser_from_dict, parse_args_as_dict
 
-    # We start with opening the config file conf.yml as a dictionary from
-    # which we can create parsers. Each top level key in the dictionary defined
-    # by the YAML file creates a group in the parser.
+    # Load configs
     with open("local/conf.yml") as f:
         def_conf = yaml.safe_load(f)
+
     parser = prepare_parser_from_dict(def_conf, parser=parser)
-    # Arguments are then parsed into a hierarchical dictionary (instead of
-    # flat, as returned by argparse) to facilitate calls to the different
-    # asteroid methods (see in main).
-    # plain_args is the direct output of parser.parse_args() and contains all
-    # the attributes in an non-hierarchical structure. It can be useful to also
-    # have it so we included it here but it is not used.
-    arg_dic, plain_args = parse_args_as_dict(parser, return_plain_args=True)
+    arg_dic = parse_args_as_dict(parser, return_plain_args=False)
     pprint(arg_dic)
     main(arg_dic)
