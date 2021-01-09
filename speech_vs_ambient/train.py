@@ -26,7 +26,7 @@ parser.add_argument("--exp_dir", default="exp/tmp", help="Full path to save best
 
 
 def main(conf):
-    # Just after instantiating, save the args. Easy loading in the future.
+    # Save args
     exp_dir = conf["main_args"]["exp_dir"]
     os.makedirs(exp_dir, exist_ok=True)
     conf_path = os.path.join(exp_dir, "conf.yml")
@@ -35,7 +35,7 @@ def main(conf):
 
     # Data loaders
     train_set = LibriMix(
-        conf["data"]["train_dir"],
+        conf["data"]["root"],
         conf["data"]["task"],
         sample_rate=conf["data"]["sample_rate"],
         n_src=conf["data"]["n_src"],
@@ -43,7 +43,7 @@ def main(conf):
         is_training=True
     )
     val_set = LibriMix(
-        conf["data"]["valid_dir"],
+        conf["data"]["root"],
         conf["data"]["task"],
         sample_rate=conf["data"]["sample_rate"],
         n_src=conf["data"]["n_src"],

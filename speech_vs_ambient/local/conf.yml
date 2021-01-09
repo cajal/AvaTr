@@ -3,25 +3,25 @@ filterbank: # Filterbank config
   kernel_size: 16
   stride: 8
 separator: # Network config
-  in_chan: 128
-  n_src: 1 # In enh_single, n_src = 1
-  ff_hid: 256
-  chunk_size: 100
-  hop_size: 50
-  n_repeats: 5
-  norm_type: "gLN"
-  ff_activation: "relu"
-  mask_act: 'sigmoid'
-  bidirectional: true
+  in_chan: 128 # number of input channels 
+  n_src: 1 # if enh_single, n_src = 1
+  ff_hid: 256 # number of hidden channels
+  chunk_size: 100 # cut audio into chunks
+  hop_size: 50 # overlap between chunks
+  n_repeats: 5 # number of transformer blocks
+  norm_type: gLN
+  ff_activation: relu # activation within transformer blocks
+  mask_act: sigmoid # activation on estimated masks
+  bidirectional: true # bidirectional RNN in transformer blocks
   dropout: 0
 avatar: # Avatar config
-  n_spk: 10
-  emb_dim: 512
+  n_spk: 10 # number of speakers
+  emb_dim: 512 # dimension of avatar embedding
 training: # Training config
-  epochs: 200
+  epochs: 200 
   batch_size: 4
   num_workers: 16
-  lr_scheduler: yes
+  lr_scheduler: plateau
   early_stop: yes
   gradient_clipping: 5
   gpus: -1 # all gpus
@@ -29,15 +29,11 @@ optim: # Optim config
   optimizer: adam
   lr: 0.001
   weight_decay: !!float 1e-5
-scheduler:
-  steps_per_epoch: 10000
-  d_model: 64
 # Data config
 data:
   task: enh_single
-  train_dir: data_10+10/wav8k/min/train-100-openset100+10-test
-  valid_dir: data_10+10/wav8k/min/train-100-openset100+10-test
+  root: ../datasets/Avatar10Mix2
   sample_rate: 8000
   n_src: 2
-  segment: 3
-  n_shot: 3
+  segment: 3 # length (sec) of input audios
+  n_shot: -1 # number of shots per speaker (-1 means not used)
