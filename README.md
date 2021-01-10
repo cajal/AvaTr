@@ -1,15 +1,16 @@
-<div align="center">
-**Avatar-based speech separation by Upload AI LLC**
-</div>
+# Avatar-based speech separation by Upload AI LLC
 
 --------------------------------------------------------------------------------
+
+The idea is based on [Dual-path Transformer](https://arxiv.org/abs/2007.13975). We add a modulator to incorporate speaker information and thus achieve personalized speech models. The overview of the model architecture is shown below.
+![AvaDPT](doc/overview.png)
 
 ## Contents
 - [Prerequisites](#prerequisites)
 - [Running code](#how-to-run-the-code)
 - [Check results](#check-results)
 
-##Prerequisites
+## Prerequisites
 ([↑up to contents](#contents))
 1. Download the `Avatar10Mix2` dataset, which contains audios recorded from 10 speakers:
 ```bash
@@ -22,7 +23,7 @@ cd ..
 pip install -r requirements.txt
 ```
 
-##How to run the code
+## How to run the code
 ([↑up to contents](#contents))
 The training and testing code for separating speech from ambient noise is provided in `speech_vs_ambient`.
 Change the directory to `speech_vs_ambient` and run the following commands:
@@ -35,7 +36,7 @@ python train.py --exp_dir exp/speech_vs_ambient
 python eval.py --exp_dir exp/speech_vs_ambient
 ```
 
-##Check results
+## Check results
 ([↑up to contents](#contents))
 We provide a simple webpage to review good test examples, which can be found at 
 ```bash
