@@ -27,8 +27,8 @@ def to_html_comparison(roots, methods, n_mix=2, n_examples=10):
 
         with open(os.path.join(dd, 'metrics.json'), 'r') as fp:
             metrics = json.load(fp)
-            mix_path = metrics['mix_path'].split('/')[-1].replace('.wav', '').replace('_', ' v.s. ')
-            row_elements = [{'text': mix_path + ': sisnr=%.2f (%.2f)' % (metrics['si_sdr'], metrics['input_si_sdr'])}]
+            mix_id = metrics['mix_id'].replace('_', ' v.s. ')
+            row_elements = [{'text': mix_id + ': sisnr=%.2f (%.2f)' % (metrics['si_sdr'], metrics['input_si_sdr'])}]
         row_elements.append( {'audio': os.path.join(dd, 'mixture.wav')} )
         row_elements.append( {'audio': os.path.join(dd, 's0.wav')} )
 
@@ -62,8 +62,8 @@ def to_html(root, n_mix=2):
     for dd in dirs:
         with open(os.path.join(dd, 'metrics.json'), 'r') as fp:
             metrics = json.load(fp)
-            mix_path = metrics['mix_path'].split('/')[-1].replace('.wav', '').replace('_', ' v.s. ')
-            row_elements = [{'text': mix_path + ': sisnr=%.2f (%.2f)' % (metrics['si_sdr'], metrics['input_si_sdr'])}]
+            mix_id = metrics['mix_id'].replace('_', ' v.s. ')
+            row_elements = [{'text': mix_id + ': sisnr=%.2f (%.2f)' % (metrics['si_sdr'], metrics['input_si_sdr'])}]
         row_elements.append( {'audio': os.path.join(dd, 'mixture.wav')} )
 
         for i in range(n_mix):
@@ -94,8 +94,8 @@ def to_html_single(root, pattern='*'):
     for dd in dirs:
         with open(os.path.join(dd, 'metrics.json'), 'r') as fp:
             metrics = json.load(fp)
-            mix_path = metrics['mix_path'].split('/')[-1].replace('.wav', '').replace('_', ' v.s. ')
-            row_elements = [{'text': mix_path + ': sisnr=%.2f (%.2f)' % (metrics['si_sdr'], metrics['input_si_sdr'])}]
+            mix_id = metrics['mix_id'].replace('_', ' v.s. ')
+            row_elements = [{'text': mix_id + ': sisnr=%.2f (%.2f)' % (metrics['si_sdr'], metrics['input_si_sdr'])}]
         row_elements.append( {'audio': os.path.join(dd, 'mixture.wav')} )
 
         row_elements.append( {'audio': os.path.join(dd, f's{1}.wav')} )
