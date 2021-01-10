@@ -5,10 +5,10 @@ import sys
 
 import torch
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from asteroid.engine import schedulers
 from asteroid.engine.optimizers import make_optimizer
 from asteroid.engine.schedulers import DPTNetScheduler
 from asteroid.engine.system import System
@@ -26,6 +26,12 @@ parser.add_argument("--exp_dir", default="exp/tmp", help="Full path to save best
 
 
 def main(conf):
+    if conf["data"]["task"] == 'enh_single':
+        conf["separator"]["n_src"] = 1
+    else:
+        conf["separator"]["n_src"] = conf["data"]["n_src"]
+    conf["filterbank"]["sample_rate"] = conf["data"]["sample_rate"] 
+
     # Save args
     exp_dir = conf["main_args"]["exp_dir"]
     os.makedirs(exp_dir, exist_ok=True)
@@ -79,7 +85,7 @@ def main(conf):
     if conf["training"]["lr_scheduler"] == "plateau":
         scheduler = ReduceLROnPlateau(optimizer=optimizer, factor=0.5, patience=30, verbose=True)
     elif conf["training"]["lr_scheduler"] == "dpt":
-        schedulers = {
+        scheduler = {
             "scheduler": DPTNetScheduler(
                 optimizer, len(train_loader) // conf["training"]["batch_size"], 64
             ),
@@ -103,7 +109,7 @@ def main(conf):
         model=model,
         loss_func=loss_func,
         optimizer=optimizer,
-        scheduler=schedulers,
+        scheduler=scheduler,
         train_loader=train_loader,
         val_loader=val_loader,
         config=conf,
@@ -118,6 +124,11 @@ def main(conf):
         distributed_backend=distributed_backend,
         gradient_clip_val=conf["training"]["gradient_clipping"],
     )
+
+    #(mix, sid), src = next(iter(train_loader))
+    #mix, sid = mix.to('cuda:0'), sid.to('cuda:0')
+    #model = model.to('cuda:0')
+    #est = model.forward((mix, sid))
 
     # Training
     trainer.fit(system)

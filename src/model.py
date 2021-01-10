@@ -128,8 +128,8 @@ class AvaTr(nn.Module):
         # Real forward
         mix_rep_0 = self.enc_norm(self.enc_activation(self.encoder(wav))) # B x C x T
         mix_rep_t = self.modulator(mix_rep_0, spk_id) # B x C x T
-        est_masks = self.masker(mix_rep_t) # B x C x T
-        masked_rep = est_masks * mix_rep_t
+        est_masks = self.masker(mix_rep_t) # B x n_src x C x T
+        masked_rep = est_masks * mix_rep_t.unsqueeze(1)
         out_wavs = pad_x_to_y(self.decoder(masked_rep), wav)
 
-        return out_wavs.squeeze(1)
+        return out_wavs.squeeze(1) if self.masker.n_src == 1 else out_wavs

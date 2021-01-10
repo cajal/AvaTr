@@ -4,7 +4,6 @@ filterbank: # Filterbank config
   stride: 8
 separator: # Network config
   in_chan: 128 # number of input channels 
-  n_src: 1 # if enh_single, n_src = 1
   ff_hid: 256 # number of hidden channels
   chunk_size: 100 # cut audio into chunks
   hop_size: 50 # overlap between chunks
