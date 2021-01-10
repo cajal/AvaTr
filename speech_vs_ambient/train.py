@@ -26,13 +26,14 @@ parser.add_argument("--exp_dir", default="exp/tmp", help="Full path to save best
 
 
 def main(conf):
+    # Config
     if conf["data"]["task"] == 'enh_single':
         conf["separator"]["n_src"] = 1
     else:
         conf["separator"]["n_src"] = conf["data"]["n_src"]
-    conf["filterbank"]["sample_rate"] = conf["data"]["sample_rate"] 
+    conf["filterbank"]["sample_rate"] = conf["data"]["sample_rate"]
 
-    # Save args
+    # Save config
     exp_dir = conf["main_args"]["exp_dir"]
     os.makedirs(exp_dir, exist_ok=True)
     conf_path = os.path.join(exp_dir, "conf.yml")
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     from asteroid.utils import prepare_parser_from_dict, parse_args_as_dict
 
     # Load configs
-    with open("local/conf.yml") as f:
+    with open("conf.yml") as f:
         def_conf = yaml.safe_load(f)
 
     parser = prepare_parser_from_dict(def_conf, parser=parser)

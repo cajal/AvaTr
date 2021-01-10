@@ -37,7 +37,7 @@ class AvaTr(nn.Module):
         fb_name (str, className): Filterbank family from which to make encoder
             and decoder. To choose among [``'free'``, ``'analytic_free'``,
             ``'param_sinc'``, ``'stft'``].
-        n_filters (int): Number of filters / Input dimension of the masker net.
+        n_filters (int): Number of filters / Input dimension of the separator net.
         kernel_size (int): Length of the filters.
         stride (int, optional): Stride of the convolution.
             If None (default), set to ``kernel_size // 2``.
@@ -92,7 +92,7 @@ class AvaTr(nn.Module):
 
         self.modulator = Modulator(n_spk, in_chan, embed_dim)
 
-        self.masker = DPTransformer(
+        self.separator = DPTransformer(
             n_feats,
             n_src,
             n_heads=4,
@@ -107,16 +107,49 @@ class AvaTr(nn.Module):
             dropout=dropout,
         )
 
-    def forward(self, inputs):
-        """ Enc/Mask/Dec model forward
+    def serialize(self):
+        """Serialize model and args
 
+        Returns:
+            dict, serialized model with keys `model_args` and `state_dict`.
+        """
+        model_conf = dict(
+            model_name=self.__class__.__name__,
+            state_dict=self.get_state_dict(),
+            model_args=self.get_model_args(),
+        )
+        return model_conf
+
+    def get_state_dict(self):
+        """ In case the state dict needs to be modified before sharing the model."""
+        return self.state_dict()
+
+    def get_model_args(self):
+        """return args to re-instantiate the class."""
+        fb_config = self.encoder.filterbank.get_config()
+        sep_config = self.separator.get_config()
+        # Assert both dict are disjoint
+        if not all(k not in fb_config for k in sep_config):
+            raise AssertionError(
+                "Filterbank and Mask network config share common keys. Merging them is not safe."
+            )
+        # Merge all args under model_args.
+        model_args = {
+            **fb_config,
+            **sep_config,
+            "enc_activation": self.enc_activation,
+        }
+        return model_args
+
+    def forward(self, inputs):
+        """
         Args:
             inputs = (wav, spk_id)
             wav (torch.Tensor): waveform tensor. 1D, 2D or 3D tensor, time last.
             spk_id (torch.Tensor): speaker id
 
         Returns:
-            torch.Tensor, of shape (batch_size, time).
+            torch.Tensor, of shape (batch_size, time) or (batch_size, n_src, time).
         """
         wav, spk_id = inputs
         spk_id = spk_id.squeeze(-1) # B x 1 -> B
@@ -130,8 +163,8 @@ class AvaTr(nn.Module):
         # Real forward
         mix_rep_0 = self.enc_norm(self.enc_activation(self.encoder(wav))) # B x C x T
         mix_rep_t = self.modulator(mix_rep_0, spk_id) # B x C x T
-        est_masks = self.masker(mix_rep_t) # B x n_src x C x T
+        est_masks = self.separator(mix_rep_t) # B x n_src x C x T
         masked_rep = est_masks * mix_rep_t.unsqueeze(1)
         out_wavs = pad_x_to_y(self.decoder(masked_rep), wav)
 
-        return out_wavs.squeeze(1) if self.masker.n_src == 1 else out_wavs
+        return out_wavs.squeeze(1) if self.separator.n_src == 1 else out_wavs
