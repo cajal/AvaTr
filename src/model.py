@@ -68,12 +68,14 @@ class AvaTr(nn.Module):
         kernel_size=16,
         n_filters=128,
         stride=8,
+        sample_rate=8000,
         **fb_kwargs,
     ):
         super(AvaTr, self).__init__()
 
         self.encoder, self.decoder = make_enc_dec(
-            fb_name, kernel_size=kernel_size, n_filters=n_filters, stride=stride, **fb_kwargs
+            fb_name, kernel_size=kernel_size, n_filters=n_filters, stride=stride,
+            sample_rate=sample_rate, **fb_kwargs
         )
 
         n_feats = self.encoder.n_feats_out
