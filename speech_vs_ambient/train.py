@@ -12,12 +12,12 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from asteroid.engine.optimizers import make_optimizer
 from asteroid.engine.schedulers import DPTNetScheduler
 from asteroid.engine.system import System
-from asteroid.losses.sdr import SingleSrcNegSDR
 
 sys.path.append("../")
 
 from src.librimix_dataset import LibriMix
 from src.model import AvaTr
+from src.utils import SingleSrcNegSDR
 
 
 # Additional arguments
