@@ -111,7 +111,7 @@ class DPTransformer(nn.Module):
     ):
         super(DPTransformer, self).__init__()
         self.in_chan = in_chan
-        self.n_src = n_src
+        self.n_src = 1
         self.n_heads = n_heads
         self.ff_hid = ff_hid
         self.chunk_size = chunk_size
@@ -222,13 +222,13 @@ class DPTransformer(nn.Module):
             mixture_w = self.ola.intra_process(mixture_w, intra)
             mixture_w = self.ola.inter_process(mixture_w, inter)
 
-        output = self.first_out(mixture_w) # (batch, in_chan * n_src, n_frames)
-        output = output.reshape(batch * self.n_src, self.in_chan, self.chunk_size, n_chunks)
+        output = self.first_out(mixture_w) # (batch, in_chan, n_frames)
+        output = output.reshape(batch, self.in_chan, self.chunk_size, n_chunks)
         output = self.ola.fold(output, output_size=n_orig_frames)
 
         output = self.net_out(output) * self.net_gate(output)
 
-        output = output.reshape(batch, self.n_src, self.in_chan, -1)
+        output = output.reshape(batch, self.in_chan, -1)
         est_mask = self.output_act(output)
         return est_mask
 

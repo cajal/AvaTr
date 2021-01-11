@@ -152,7 +152,6 @@ class AvaTr(nn.Module):
             torch.Tensor, of shape (batch_size, time) or (batch_size, n_src, time).
         """
         wav, spk_id = inputs
-        spk_id = spk_id.squeeze(-1) # B x 1 -> B
 
         # Handle 1D, 2D or n-D inputs
         if wav.ndim == 1:
@@ -160,11 +159,22 @@ class AvaTr(nn.Module):
         if wav.ndim == 2:
             wav = wav.unsqueeze(1)
 
-        # Real forward
+        # Encoding
         mix_rep_0 = self.enc_norm(self.enc_activation(self.encoder(wav))) # B x C x T
-        mix_rep_t = self.modulator(mix_rep_0, spk_id) # B x C x T
-        est_masks = self.separator(mix_rep_t) # B x n_src x C x T
-        masked_rep = est_masks * mix_rep_t.unsqueeze(1)
+        B, C, T = mix_rep_0.shape
+
+        # Modulation
+        mix_rep_t = self.modulator(mix_rep_0, spk_id) # B x n_src x C x T
+        mix_rep_t = mix_rep_t.view(-1, C, T) # B * n_src x C x T
+
+        # Masking
+        est_masks = self.separator(mix_rep_t) # B * n_src x C x T
+
+        # Decoding
+        masked_rep = est_masks.view(B, -1, C, T) * mix_rep_0.unsqueeze(1)
         out_wavs = pad_x_to_y(self.decoder(masked_rep), wav)
 
-        return out_wavs.squeeze(1) if self.separator.n_src == 1 else out_wavs
+        if out_wavs.shape[1] == 1: # task == ehn_single
+            out_wavs = out_wavs.squeeze(1)
+
+        return out_wavs

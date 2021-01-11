@@ -48,7 +48,7 @@ class Modulator(nn.Module):
         mixture_feature (B, C, T): feature of the mixed audio
         spk_id (B, embed_dim): speaker id
     Outputs:
-        mixture_feature (B, C, T): modulated feature
+        mixture_feature (B, n_src, C, T): modulated feature
     """
     def __init__(self, n_spk, feat_dim, embed_dim):
         super(Modulator, self).__init__()
@@ -57,6 +57,16 @@ class Modulator(nn.Module):
         self.att = SigmoidDotAttention(feat_dim, embed_dim)
 
     def forward(self, mixture_feature, spk_id):
-        dvec = self.avatar(spk_id) # B x emb_dim
-        mixture_feature_t, _ = self.att(mixture_feature, dvec)
+        if not isinstance(spk_id, list):
+            spk_id = [spk_id]
+
+        mixture_feature_t = []
+
+        for component in spk_id:
+            dvec = self.avatar(component) # B x emb_dim
+            mix_f, _ = self.att(mixture_feature, dvec) # B x feat_dim x T
+            mixture_feature_t.append(mix_f)
+
+        mixture_feature_t = torch.stack(mixture_feature_t, dim=1) # B x n_src x feat_dim x T
+
         return mixture_feature_t
