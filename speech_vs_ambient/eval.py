@@ -71,7 +71,7 @@ def main(args, conf):
         # Forward the network on the mixture.
         (mix, ids), sources = tensors_to_device(test_set[idx], device=model_device)
         ids = torch.LongTensor([ids]).to(model_device)
-        est_sources = model((mix.unsqueeze(0), ids.unsqueeze(0)))
+        est_sources = model((mix.unsqueeze(0), ids))
 
         mix_np = mix.cpu().data.numpy()
         sources_np = sources.cpu().data.numpy()
