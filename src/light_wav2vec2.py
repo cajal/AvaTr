@@ -1,8 +1,3 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
-
 import logging
 import math
 from typing import List, Tuple
@@ -13,12 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fairseq import utils
 from fairseq.data.data_utils import compute_mask_indices
-from fairseq.models import BaseFairseqModel, register_model, register_model_architecture
+from fairseq.models import BaseFairseqModel
 from fairseq.modules import (
     Fp32GroupNorm,
     Fp32LayerNorm,
     GradMultiply,
-    GumbelVectorQuantizer,
     LayerNorm,
     MultiheadAttention,
     SamePad,
@@ -28,7 +22,6 @@ from fairseq.modules.transformer_sentence_encoder import init_bert_params
 from fairseq.utils import buffered_arange
 
 
-#@register_model("wav2vec2")
 class Wav2Vec2Model(BaseFairseqModel):
     @staticmethod
     def add_args(parser):
@@ -330,7 +323,7 @@ class Wav2Vec2Model(BaseFairseqModel):
         return state_dict
 
     @classmethod
-    def build_model(cls, args, task=None):
+    def build_model(cls, args):
         """Build a new model instance."""
 
         # make sure all arguments are present
@@ -365,9 +358,10 @@ class Wav2Vec2Model(BaseFairseqModel):
 
         features = self.dropout_input(features)
 
-        x = self.encoder(features, padding_mask=padding_mask)
+        x, pos_embed = self.encoder(features, padding_mask=padding_mask)
 
-        return {"x": x, "padding_mask": padding_mask, "features_pen": features_pen}
+        return {"x": x, "pos_embed": pos_embed,
+                "padding_mask": padding_mask, "features_pen": features_pen}
 
 
 class ConvFeatureExtractionModel(nn.Module):
@@ -496,21 +490,21 @@ class TransformerEncoder(nn.Module):
         self.apply(init_bert_params)
 
     def forward(self, x, padding_mask=None):
-        x = self.extract_features(x, padding_mask)
+        x, pos_embed = self.extract_features(x, padding_mask)
 
         if self.layer_norm_first:
             x = self.layer_norm(x)
 
-        return x
+        return x, pos_embed
 
     def extract_features(self, x, padding_mask=None):
 
         if padding_mask is not None:
             x[padding_mask] = 0
 
-        x_conv = self.pos_conv(x.transpose(1, 2))
+        x_conv = self.pos_conv(x.transpose(1, 2)) # B x C x T
         x_conv = x_conv.transpose(1, 2)
-        x += x_conv
+        x += x_conv # B x T x C
 
         if not self.layer_norm_first:
             x = self.layer_norm(x)
@@ -530,7 +524,7 @@ class TransformerEncoder(nn.Module):
         # T x B x C -> B x T x C
         x = x.transpose(0, 1)
 
-        return x
+        return x, x_conv
 
     def max_positions(self):
         """Maximum output length supported by the encoder."""
@@ -647,7 +641,6 @@ class TransformerSentenceEncoderLayer(nn.Module):
         return x, attn
 
 
-#@register_model_architecture("wav2vec2", "wav2vec2")
 def base_architecture(args):
     args.extractor_mode = getattr(args, "extractor_mode", "default")
 
@@ -722,7 +715,7 @@ if __name__ == '__main__':
 
     path = '/mnt/scratch07/hushell/UploadAI/ckpts/wav2vec_small.pt'
     cp = torch.load(path)
-    pretrained_model = Wav2Vec2Model.build_model(cp['args'], task=None).to('cuda:0')
+    pretrained_model = Wav2Vec2Model.build_model(cp['args']).to('cuda:0')
 
     x = torch.rand(2, 24000).to('cuda:0')
     y = pretrained_model(x)
