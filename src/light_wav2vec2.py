@@ -111,6 +111,13 @@ class Wav2Vec2Model(BaseFairseqModel):
         )
 
         parser.add_argument(
+            "--deconv-feature-layers",
+            type=str,
+            metavar="EXPR",
+            help="deconvolutional layers [(dim, kernel_size, stride), ...]",
+        )
+
+        parser.add_argument(
             "--logit-temp", type=float, help="temperature to divide logits by"
         )
 
@@ -449,6 +456,7 @@ class DeConvModel(nn.Module):
     def __init__(
         self,
         conv_layers: List[Tuple[int, int, int]],
+        input_dim: int = 512,
         dropout: float = 0.0,
         mode: str = "default",
         conv_bias: bool = False,
@@ -496,9 +504,9 @@ class DeConvModel(nn.Module):
             else:
                 return nn.Sequential(make_conv(), nn.Dropout(p=dropout), nn.GELU())
 
-        in_d = 1
+        in_d = input_dim
         self.conv_layers = nn.ModuleList()
-        for i, cl in enumerate(conv_layers[::-1]):
+        for i, cl in enumerate(conv_layers):
             assert len(cl) == 3, "invalid conv definition: " + str(cl)
             (dim, k, stride) = cl
 
@@ -743,6 +751,13 @@ def base_architecture(args):
     conv_feature_layers += " + [(512, 4, 2)] * 3"
     conv_feature_layers += " + [(512, 1, 1)]"
     args.conv_feature_layers = getattr(args, "conv_feature_layers", conv_feature_layers)
+
+    # dim, k, stride
+    deconv_feature_layers = "[(512, 3, 2)] * 6 + [(1, 10, 5)]"
+    if hasattr(args, "deconv_feature_layers"):
+        args.deconv_feature_layers = getattr(args, "deconv_feature_layers", deconv_feature_layers)
+    else:
+        setattr(args, "deconv_feature_layers", deconv_feature_layers)
 
     args.logit_temp = getattr(args, "logit_temp", 0.1)
 
