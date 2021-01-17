@@ -56,7 +56,7 @@ class AvaTr(nn.Module):
         # Wav2Vec2 encoder
         w2v_dict = torch.load(w2v_ckpt)
         self.wav2vec = Wav2Vec2Model.build_model(w2v_dict['args'])
-        self.wav2vec.load_state_dict(ckpt['model'])
+        self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
         if freeze_w2v:
             for param in self.wav2vec.parameters():
                 param.requires_grad = False
