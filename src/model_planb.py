@@ -73,14 +73,12 @@ class AvaTr(nn.Module):
         pos_embed = results['pos_embed'].transpose(0, 1) # T x B x C
 
         query_embed = self.avatar(spk_id) # B x 512
-        query_embed = query_embed.unsqueeze(1).repeat(1, T, 1) # B x T x 512
-        mask = mask.flatten(1)
+        query_embed = query_embed.unsqueeze(0).repeat(T, 1, 1) # T x B x 512
 
         tgt = torch.zeros_like(query_embed)
-        memory = self.encoder(mix, src_key_padding_mask=mask, pos=pos_embed)
-        hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
+        hs = self.decoder(tgt, mix_feat, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
-        return hs.transpose(1, 2), memory.permute(1, 2, 0).view(B, C, h, w)
+        return hs
 
 
 class TransformerEncoder(nn.Module):

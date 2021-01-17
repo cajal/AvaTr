@@ -313,8 +313,7 @@ class Wav2Vec2Model(BaseFairseqModel):
 
         self.post_extract_proj = (
             nn.Linear(self.embed, args.encoder_embed_dim)
-            if self.embed != args.encoder_embed_dim and not args.quantize_input
-            else None
+            if self.embed != args.encoder_embed_dim else None
         )
 
         self.dropout_input = nn.Dropout(args.dropout_input)
