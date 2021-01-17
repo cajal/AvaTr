@@ -13,6 +13,7 @@ from typing import Optional, List
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+from .light_wav2vec2 import Wav2Vec2Model
 
 
 class AvaTr(nn.Module):
