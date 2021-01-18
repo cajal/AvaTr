@@ -25,13 +25,6 @@ parser.add_argument("--exp_dir", default="exp/tmp", help="Full path to save best
 
 
 def main(conf):
-    # Config
-    if conf["data"]["task"] == 'enh_single':
-        conf["separator"]["n_src"] = 1
-    else:
-        conf["separator"]["n_src"] = conf["data"]["n_src"]
-    conf["filterbank"]["sample_rate"] = conf["data"]["sample_rate"]
-
     # Save config
     exp_dir = conf["main_args"]["exp_dir"]
     os.makedirs(exp_dir, exist_ok=True)
@@ -73,7 +66,7 @@ def main(conf):
     )
 
     # Model
-    model = AvaTr(**conf["avatar"], **conf["separator"], **conf["filterbank"])
+    model = AvaTr(**conf["avatar"], **conf["separator"])
 
     # Loss function
     loss_func = SingleSrcNegSDR("sisdr", reduction='mean')
@@ -83,14 +76,7 @@ def main(conf):
 
     # lr scheduler
     if conf["training"]["lr_scheduler"] == "plateau":
-        scheduler = ReduceLROnPlateau(optimizer=optimizer, factor=0.5, patience=30, verbose=True)
-    elif conf["training"]["lr_scheduler"] == "dpt":
-        scheduler = {
-            "scheduler": DPTNetScheduler(
-                optimizer, len(train_loader) // conf["training"]["batch_size"], 64
-            ),
-            "interval": "step",
-        }
+        scheduler = ReduceLROnPlateau(optimizer=optimizer, factor=0.5, patience=20, verbose=True)
     else:
         scheduler = None
 

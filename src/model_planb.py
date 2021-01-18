@@ -35,8 +35,6 @@ class AvaTr(nn.Module):
 
         super().__init__()
 
-        self.nhead = nhead
-
         w2v_dict = torch.load(w2v_ckpt)
         embed_dim = w2v_dict['args'].encoder_embed_dim
         d_model = w2v_dict['args'].encoder_embed_dim
@@ -51,6 +49,7 @@ class AvaTr(nn.Module):
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec)
 
+        # DeConv
         self.post_extract_unproj = nn.Linear(d_model, 512)
         self.post_extract_norm = nn.LayerNorm(512)
         self.deconv = DeConvModel(
