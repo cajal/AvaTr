@@ -83,14 +83,15 @@ class AvaTr(nn.Module):
 
         tgt = torch.zeros_like(query_embed)
         hs = self.decoder(tgt, mix_feat, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=query_embed)
+                          pos=pos_embed, query_pos=query_embed) # T x B x 512
 
         hs = self.post_extract_unproj(hs)
         hs = self.post_extract_norm(hs)
+        hs = hs.permute(1, 2, 0)
 
         signal = self.deconv(hs)
 
-        return hs
+        return signal.squeeze(1)
 
 
 class TransformerEncoder(nn.Module):
