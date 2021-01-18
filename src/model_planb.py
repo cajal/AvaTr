@@ -71,7 +71,9 @@ class AvaTr(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, mix, spk_id, mask=None):
+    def forward(self, inputs, mask=None):
+        mix, spk_id = inputs
+
         results = self.wav2vec(mix, padding_mask=mask)
         mix_feat = results['x'].transpose(0, 1) # T x B x C
         T, B, C = mix_feat.shape
