@@ -28,11 +28,12 @@ class AvaTr(nn.Module):
 
         # Wav2Vec2 encoder
         w2v_dict = torch.load(w2v_ckpt)
+        w2v_dict['args'].encoder_embed_dim = 512
         self.wav2vec = Wav2Vec2Model.build_model(w2v_dict['args'])
-        self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
-        if freeze_w2v:
-            for param in self.wav2vec.parameters():
-                param.requires_grad = False
+        #self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
+        #if freeze_w2v:
+        #    for param in self.wav2vec.parameters():
+        #        param.requires_grad = False
 
         embed_dim = w2v_dict['args'].encoder_embed_dim
         d_model = w2v_dict['args'].encoder_embed_dim
@@ -51,7 +52,7 @@ class AvaTr(nn.Module):
         self.mask_act = nn.Sigmoid()
 
         # DeConv
-        self.post_extract_unproj = nn.Linear(d_model, 512)
+        #self.post_extract_unproj = nn.Linear(d_model, 512)
         #self.post_extract_norm = nn.LayerNorm(512)
         self.deconv = DeConvModel(
             conv_layers=[(512, 3, 2)] * 6 + [(1, 10, 5)],
@@ -81,7 +82,7 @@ class AvaTr(nn.Module):
         hs = mix_feat * mix_mask
 
         # deconv
-        hs = self.post_extract_unproj(hs)
+        #hs = self.post_extract_unproj(hs)
         #hs = self.post_extract_norm(hs)
         hs = hs.permute(1, 2, 0)
         signal = self.deconv(hs)
