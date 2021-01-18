@@ -6,7 +6,7 @@ separator: # Network config
   dim_feedforward: 2048
   dropout: 0.1
   activation: relu
-  normalize_before: False,
+  normalize_before: False
   return_intermediate_dec: False
 avatar: # Avatar config
   n_spk: 10 # number of speakers

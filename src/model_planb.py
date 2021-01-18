@@ -1,12 +1,3 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-"""
-DETR Transformer class.
-
-Copy-paste from torch.nn.Transformer with modifications:
-    * positional encodings are passed in MHattention
-    * extra LN at the end of encoder is removed
-    * decoder returns a stack of activations from all decoding layers
-"""
 import copy
 from typing import Optional, List
 
@@ -35,7 +26,14 @@ class AvaTr(nn.Module):
 
         super().__init__()
 
+        # Wav2Vec2 encoder
         w2v_dict = torch.load(w2v_ckpt)
+        self.wav2vec = Wav2Vec2Model.build_model(w2v_dict['args'])
+        self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
+        if freeze_w2v:
+            for param in self.wav2vec.parameters():
+                param.requires_grad = False
+
         embed_dim = w2v_dict['args'].encoder_embed_dim
         d_model = w2v_dict['args'].encoder_embed_dim
 
@@ -45,78 +43,50 @@ class AvaTr(nn.Module):
         # Decoder
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
-        decoder_norm = nn.LayerNorm(d_model)
+        #decoder_norm = nn.LayerNorm(d_model)
+        decoder_norm = None
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec)
 
+        self.mask_act = nn.Sigmoid()
+
         # DeConv
         self.post_extract_unproj = nn.Linear(d_model, 512)
-        self.post_extract_norm = nn.LayerNorm(512)
+        #self.post_extract_norm = nn.LayerNorm(512)
         self.deconv = DeConvModel(
             conv_layers=[(512, 3, 2)] * 6 + [(1, 10, 5)],
             dropout=0.0,
         )
 
-        self._reset_parameters()
-
-        # Wav2Vec2 encoder
-        self.wav2vec = Wav2Vec2Model.build_model(w2v_dict['args'])
-        self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
-        if freeze_w2v:
-            for param in self.wav2vec.parameters():
-                param.requires_grad = False
-
-    def _reset_parameters(self):
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-
     def forward(self, inputs, mask=None):
         mix, spk_id = inputs
 
+        # conv + wav2vec encoding
         results = self.wav2vec(mix, padding_mask=mask)
         mix_feat = results['x'].transpose(0, 1) # T x B x C
         T, B, C = mix_feat.shape
         pos_embed = results['pos_embed'].transpose(0, 1) # T x B x C
 
+        # avatar embedding
         query_embed = self.avatar(spk_id) # B x 512
-        query_embed = query_embed.unsqueeze(0).repeat(T, 1, 1) # T x B x 512
+        query_embed = query_embed.unsqueeze(0).repeat(T, 1, 1) # T x B x C
 
-        tgt = torch.zeros_like(query_embed)
-        hs = self.decoder(tgt, mix_feat, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=query_embed) # T x B x 512
+        # mask generation
+        tgt = torch.ones_like(query_embed)
+        mix_mask = self.decoder(tgt, mix_feat, memory_key_padding_mask=mask,
+                            pos=pos_embed, query_pos=query_embed) # T x B x C
+        mix_mask = self.mask_act(mix_mask)
 
+        # masking
+        hs = mix_feat * mix_mask
+
+        # deconv
         hs = self.post_extract_unproj(hs)
-        hs = self.post_extract_norm(hs)
+        #hs = self.post_extract_norm(hs)
         hs = hs.permute(1, 2, 0)
-
         signal = self.deconv(hs)
 
         return signal.squeeze(1)
-
-
-class TransformerEncoder(nn.Module):
-
-    def __init__(self, encoder_layer, num_layers, norm=None):
-        super().__init__()
-        self.layers = _get_clones(encoder_layer, num_layers)
-        self.num_layers = num_layers
-        self.norm = norm
-
-    def forward(self, src,
-                mask: Optional[Tensor] = None,
-                src_key_padding_mask: Optional[Tensor] = None,
-                pos: Optional[Tensor] = None):
-        output = src
-
-        for layer in self.layers:
-            output = layer(output, src_mask=mask,
-                           src_key_padding_mask=src_key_padding_mask, pos=pos)
-
-        if self.norm is not None:
-            output = self.norm(output)
-
-        return output
 
 
 class TransformerDecoder(nn.Module):
@@ -127,6 +97,13 @@ class TransformerDecoder(nn.Module):
         self.num_layers = num_layers
         self.norm = norm
         self.return_intermediate = return_intermediate
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def forward(self, tgt, memory,
                 tgt_mask: Optional[Tensor] = None,
@@ -158,66 +135,6 @@ class TransformerDecoder(nn.Module):
             return torch.stack(intermediate)
 
         return output
-
-
-class TransformerEncoderLayer(nn.Module):
-
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
-        super().__init__()
-        self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-        # Implementation of Feedforward model
-        self.linear1 = nn.Linear(d_model, dim_feedforward)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model)
-
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-
-        self.activation = _get_activation_fn(activation)
-        self.normalize_before = normalize_before
-
-    def with_pos_embed(self, tensor, pos: Optional[Tensor]):
-        return tensor if pos is None else tensor + pos
-
-    def forward_post(self,
-                     src,
-                     src_mask: Optional[Tensor] = None,
-                     src_key_padding_mask: Optional[Tensor] = None,
-                     pos: Optional[Tensor] = None):
-        q = k = self.with_pos_embed(src, pos)
-        src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
-        src = src + self.dropout1(src2)
-        src = self.norm1(src)
-        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
-        src = src + self.dropout2(src2)
-        src = self.norm2(src)
-        return src
-
-    def forward_pre(self, src,
-                    src_mask: Optional[Tensor] = None,
-                    src_key_padding_mask: Optional[Tensor] = None,
-                    pos: Optional[Tensor] = None):
-        src2 = self.norm1(src)
-        q = k = self.with_pos_embed(src2, pos)
-        src2 = self.self_attn(q, k, value=src2, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
-        src = src + self.dropout1(src2)
-        src2 = self.norm2(src)
-        src2 = self.linear2(self.dropout(self.activation(self.linear1(src2))))
-        src = src + self.dropout2(src2)
-        return src
-
-    def forward(self, src,
-                src_mask: Optional[Tensor] = None,
-                src_key_padding_mask: Optional[Tensor] = None,
-                pos: Optional[Tensor] = None):
-        if self.normalize_before:
-            return self.forward_pre(src, src_mask, src_key_padding_mask, pos)
-        return self.forward_post(src, src_mask, src_key_padding_mask, pos)
 
 
 class TransformerDecoderLayer(nn.Module):
@@ -307,19 +224,6 @@ class TransformerDecoderLayer(nn.Module):
 
 def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
-
-
-def build_transformer(args):
-    return Transformer(
-        d_model=args.hidden_dim,
-        dropout=args.dropout,
-        nhead=args.nheads,
-        dim_feedforward=args.dim_feedforward,
-        num_encoder_layers=args.enc_layers,
-        num_decoder_layers=args.dec_layers,
-        normalize_before=args.pre_norm,
-        return_intermediate_dec=True,
-    )
 
 
 def _get_activation_fn(activation):
