@@ -29,6 +29,10 @@ class AvaTr(nn.Module):
         # Wav2Vec2 encoder
         w2v_dict = torch.load(w2v_ckpt)
         w2v_dict['args'].encoder_embed_dim = 512
+        w2v_dict['args'].encoder_attention_heads = 8
+        w2v_dict['args'].encoder_ffn_embed_dim = 2048
+        w2v_dict['args'].encoder_layers = 6
+        w2v_dict['args'].encoder_normalize_before = False
         self.wav2vec = Wav2Vec2Model.build_model(w2v_dict['args'])
         #self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
         #if freeze_w2v:
