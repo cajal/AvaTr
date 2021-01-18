@@ -13,7 +13,7 @@ from typing import Optional, List
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from .light_wav2vec2 import Wav2Vec2Model
+from .light_wav2vec2 import Wav2Vec2Model, DeConvModel
 
 
 class AvaTr(nn.Module):
@@ -21,12 +21,10 @@ class AvaTr(nn.Module):
         self,
         # Avatars
         n_spk,
-        embed_dim=512,
         # Wav2Vec2 encoder
         w2v_ckpt='/mnt/scratch07/hushell/UploadAI/ckpts/wav2vec_small.pt',
         freeze_w2v=False,
         # DeTr decoder
-        d_model=512,
         nhead=8,
         num_decoder_layers=6,
         dim_feedforward=2048,
@@ -40,6 +38,9 @@ class AvaTr(nn.Module):
         self.d_model = d_model
         self.nhead = nhead
 
+        w2v_dict = torch.load(w2v_ckpt)
+        embed_dim = w2v_dict['args'].encoder_embed_dim
+        d_model = w2v_dict['args'].encoder_embed_dim
 
         # Avatars
         self.avatar = nn.Embedding(n_spk, embed_dim)
@@ -51,10 +52,16 @@ class AvaTr(nn.Module):
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec)
 
+        self.post_extract_unproj = nn.Linear(d_model, 512)
+        self.post_extract_norm = nn.LayerNorm(512)
+        self.deconv = DeConvModel(
+            conv_layers=[(512, 3, 2)] * 6 + [(1, 10, 5)],
+            dropout=0.0,
+        )
+
         self._reset_parameters()
 
         # Wav2Vec2 encoder
-        w2v_dict = torch.load(w2v_ckpt)
         self.wav2vec = Wav2Vec2Model.build_model(w2v_dict['args'])
         self.wav2vec.load_state_dict(w2v_dict['model'], strict=False)
         if freeze_w2v:
@@ -67,10 +74,9 @@ class AvaTr(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, mix, spk_id, mask=None):
-        B, C, T = mix.shape
-
         results = self.wav2vec(mix, padding_mask=mask)
         mix_feat = results['x'].transpose(0, 1) # T x B x C
+        T, B, C = mix_feat.shape
         pos_embed = results['pos_embed'].transpose(0, 1) # T x B x C
 
         query_embed = self.avatar(spk_id) # B x 512
@@ -79,6 +85,12 @@ class AvaTr(nn.Module):
         tgt = torch.zeros_like(query_embed)
         hs = self.decoder(tgt, mix_feat, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
+
+        hs = self.post_extract_unproj(hs)
+        hs = self.post_extract_norm(hs)
+
+        signal = self.deconv(hs)
+
         return hs
 
 
@@ -144,7 +156,7 @@ class TransformerDecoder(nn.Module):
         if self.return_intermediate:
             return torch.stack(intermediate)
 
-        return output.unsqueeze(0)
+        return output
 
 
 class TransformerEncoderLayer(nn.Module):
