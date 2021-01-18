@@ -35,7 +35,6 @@ class AvaTr(nn.Module):
 
         super().__init__()
 
-        self.d_model = d_model
         self.nhead = nhead
 
         w2v_dict = torch.load(w2v_ckpt)
