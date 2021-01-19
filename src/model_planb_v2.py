@@ -51,7 +51,7 @@ class AvaTr(nn.Module):
         )
 
         self.enc_activation = nn.ReLU() if enc_activation == 'relu' else nn.Identity()
-        self.enc_norm = nn.LayerNorm(n_feats)
+        self.enc_norm = GlobLN(n_feats)
 
         # Avatars
         self.avatar = nn.Embedding(n_spk, embed_dim)
