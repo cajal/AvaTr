@@ -43,7 +43,7 @@ class AvaTr(nn.Module):
         )
 
         n_feats = self.conv.n_feats_out
-        assert in_chan == n_feats, (
+        assert d_model == n_feats, (
             "Number of filterbank output channels"
             " and number of model channels should "
             "be the same. Received "
@@ -60,7 +60,7 @@ class AvaTr(nn.Module):
         self.tsfm = Transformer(
             d_model=d_model,
             dropout=dropout,
-            nhead=nheads,
+            nhead=nhead,
             dim_feedforward=dim_feedforward,
             num_encoder_layers=num_encoder_layers,
             num_decoder_layers=num_decoder_layers,
