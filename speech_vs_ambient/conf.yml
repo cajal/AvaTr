@@ -1,6 +1,6 @@
 filterbank: # Filterbank config
   n_filters: 128
-  kernel_size: 16
+  kernel_size: 8
   stride: 8
   enc_activation: relu
   fb_name: free

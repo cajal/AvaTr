@@ -72,7 +72,7 @@ class AvaTr(nn.Module):
 
         self.pos_conv = nn.Conv1d(
             d_model, d_model,
-            kernel_size=128,
+            kernel_size=129,
             padding=128 // 2,
             groups=16,
         )
