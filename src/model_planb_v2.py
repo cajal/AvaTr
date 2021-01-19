@@ -26,11 +26,11 @@ class AvaTr(nn.Module):
         normalize_before=False,
         return_intermediate_dec=False,
         # waveform encoder/decoder params
-        enc_activation="relu",
-        fb_name="free",
         kernel_size=16,
         n_filters=128,
         stride=8,
+        enc_activation="relu",
+        fb_name="free",
         sample_rate=8000,
         **fb_kwargs):
 
@@ -87,7 +87,7 @@ class AvaTr(nn.Module):
             wav = wav.unsqueeze(1)
 
         # mix feature
-        mix_rep_0 = self.enc_norm(self.enc_activation(self.encoder(wav))) # B x C x T
+        mix_rep_0 = self.enc_norm(self.enc_activation(self.conv(wav))) # B x C x T
 
         # positional encoding
         pos_embed = self.pos_conv(mix_rep_0.transpose(1, 2)) # B x C x T
@@ -103,7 +103,7 @@ class AvaTr(nn.Module):
         masked_rep = mix_rep_0 * mix_mask # TODO: mix_rep_t
 
         # source prediction
-        out_wavs = pad_x_to_y(self.decoder(masked_rep), wav)
+        out_wavs = pad_x_to_y(self.deconv(masked_rep), wav)
 
         if out_wavs.shape[1] == 1: # task == ehn_single
             out_wavs = out_wavs.squeeze(1)
