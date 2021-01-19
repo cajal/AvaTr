@@ -100,7 +100,7 @@ class AvaTr(nn.Module):
         mix_mask = self.mask_act(hs)
 
         # masking
-        masked_rep = mix_rep_0 * mix_mask # TODO: mix_rep_t
+        masked_rep = mix_rep_t * mix_mask 
 
         # source prediction
         out_wavs = pad_x_to_y(self.deconv(masked_rep), wav)
