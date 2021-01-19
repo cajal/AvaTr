@@ -1,7 +1,15 @@
+filterbank: # Filterbank config
+  n_filters: 128
+  kernel_size: 16
+  stride: 8
+  enc_activation: relu
+  fb_name: free
 separator: # Network config
   w2v_ckpt: /mnt/scratch07/hushell/UploadAI/ckpts/wav2vec_small.pt
   freeze_w2v: False
-  nhead: 8
+  d_model: 128
+  nhead: 4
+  num_encoder_layers: 6
   num_decoder_layers: 6
   dim_feedforward: 2048
   dropout: 0.1
@@ -10,6 +18,7 @@ separator: # Network config
   return_intermediate_dec: False
 avatar: # Avatar config
   n_spk: 10 # number of speakers
+  embed_dim: 128
 training: # Training config
   epochs: 200 
   batch_size: 4

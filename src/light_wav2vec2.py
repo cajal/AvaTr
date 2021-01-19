@@ -340,7 +340,7 @@ class Wav2Vec2Model(BaseFairseqModel):
     def forward(self, source, padding_mask=None):
 
         if self.feature_grad_mult > 0:
-            features = self.feature_extractor(source)
+            features = self.feature_extractor(source) # B x C x T
             if self.feature_grad_mult != 1.0:
                 features = GradMultiply.apply(features, self.feature_grad_mult)
         else:
@@ -349,7 +349,7 @@ class Wav2Vec2Model(BaseFairseqModel):
 
         features_pen = features.float().pow(2).mean()
 
-        features = features.transpose(1, 2)
+        features = features.transpose(1, 2) # B x T x C
         features = self.layer_norm(features)
 
         if padding_mask is not None:

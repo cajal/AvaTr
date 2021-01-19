@@ -15,7 +15,7 @@ from asteroid.engine.system import System
 sys.path.append("../")
 
 from src.librimix_dataset import LibriMix
-from src.model_planb import AvaTr
+from src.model_planb_v2 import AvaTr
 from src.utils import SingleSrcNegSDR
 
 
@@ -66,7 +66,7 @@ def main(conf):
     )
 
     # Model
-    model = AvaTr(**conf["avatar"], **conf["separator"])
+    model = AvaTr(**conf["avatar"], **conf["separator"], **conf["filterbank"])
 
     # Loss function
     loss_func = SingleSrcNegSDR("sisdr", reduction='mean')
@@ -111,10 +111,10 @@ def main(conf):
         gradient_clip_val=conf["training"]["gradient_clipping"],
     )
 
-    #(mix, sid), src = next(iter(train_loader))
-    #mix, sid = mix.to('cuda:0'), sid.to('cuda:0')
-    #model = model.to('cuda:0')
-    #est = model.forward((mix, sid))
+    (mix, sid), src = next(iter(train_loader))
+    mix, sid = mix.to('cuda:0'), sid.to('cuda:0')
+    model = model.to('cuda:0')
+    est = model.forward((mix, sid))
 
     # Training
     trainer.fit(system)
