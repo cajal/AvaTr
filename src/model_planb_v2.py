@@ -90,7 +90,7 @@ class AvaTr(nn.Module):
         mix_rep_0 = self.enc_norm(self.enc_activation(self.conv(wav))) # B x C x T
 
         # positional encoding
-        pos_embed = self.pos_conv(mix_rep_0.transpose(1, 2)) # B x C x T
+        pos_embed = self.pos_conv(mix_rep_0) # B x C x T
 
         # avatar embedding TODO: B * n_src x C
         query_embed = self.avatar(spk_id) # B x C
