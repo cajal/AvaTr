@@ -135,7 +135,7 @@ def main(conf):
     system.load_state_dict(state_dict=state_dict["state_dict"])
     system.cpu()
 
-    to_save = system.model.serialize()
+    to_save = system.model.serialize(scheduler.get_last_lr() if scheduler else conf['optim']['lr'])
     torch.save(to_save, os.path.join(exp_dir, "best_model.pth"))
 
 

@@ -1,5 +1,5 @@
 filterbank: # Filterbank config
-  n_filters: 128
+  n_filters: 256
   kernel_size: 8
   stride: 8
   enc_activation: relu
@@ -7,8 +7,8 @@ filterbank: # Filterbank config
 separator: # Network config
   w2v_ckpt: /mnt/scratch07/hushell/UploadAI/ckpts/wav2vec_small.pt
   freeze_w2v: False
-  d_model: 128
-  nhead: 4
+  d_model: 256
+  nhead: 8
   num_encoder_layers: 6
   num_decoder_layers: 6
   dim_feedforward: 2048
@@ -18,10 +18,10 @@ separator: # Network config
   return_intermediate_dec: False
 avatar: # Avatar config
   n_spk: 10 # number of speakers
-  embed_dim: 128
+  embed_dim: 256
 training: # Training config
-  epochs: 200 
-  batch_size: 2
+  epochs: 400 
+  batch_size: 1
   num_workers: 16
   lr_scheduler: plateau
   early_stop: yes
