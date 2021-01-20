@@ -44,6 +44,7 @@ def main(args, conf):
                   **conf["filterbank"])
     ckpt = torch.load(model_path, map_location="cpu")
     model.load_state_dict(ckpt["state_dict"])
+    model.eval()
 
     # Handle device placement
     if args["use_gpu"]:
