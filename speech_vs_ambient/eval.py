@@ -16,7 +16,7 @@ import sys
 sys.path.append("../")
 
 from src.librimix_dataset import LibriMix
-from src.model import AvaTr
+from src.model_planb_v2 import AvaTr
 from src.vis import to_html_single
 from src.utils import tensors_to_device
 
@@ -44,6 +44,7 @@ def main(args, conf):
                   **conf["filterbank"])
     ckpt = torch.load(model_path, map_location="cpu")
     model.load_state_dict(ckpt["state_dict"])
+    model.eval()
 
     # Handle device placement
     if args["use_gpu"]:
