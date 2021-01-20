@@ -31,7 +31,7 @@ parser.add_argument(
     help="Directory in exp_dir where the eval results" " will be stored",
 )
 parser.add_argument(
-    "--use_gpu", type=int, default=1, help="Whether to use the GPU for model execution"
+    "--gpu", type=int, default=0, help="Which GPU for model execution"
 )
 
 compute_metrics = ["si_sdr", "sdr", "sir", "sar", "stoi"]
@@ -47,8 +47,8 @@ def main(args, conf):
     model.eval()
 
     # Handle device placement
-    if args["use_gpu"]:
-        model.cuda()
+    if args["gpu"] >= 0:
+        model = model.to('cuda:%d' % args["gpu"])
     model_device = next(model.parameters()).device
 
     test_set = LibriMix(
