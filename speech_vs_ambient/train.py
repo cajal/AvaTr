@@ -68,6 +68,13 @@ def main(conf):
     # Model
     model = AvaTr(**conf["avatar"], **conf["separator"], **conf["filterbank"])
 
+    # If previous ckpt exists, continue previous training
+    ckpt = os.path.join(exp_dir, "best_model.pth")
+    if os.path.exists(ckpt):
+        ckpt = torch.load(ckpt)
+        missing_keys, unexpected_keys = model.load_state_dict(ckpt['state_dict'], strict=False)
+        print(f"Unmatched keys: {missing_keys}, {unexpected_keys}")
+
     # Loss function
     loss_func = SingleSrcNegSDR("sisdr", reduction='mean')
 

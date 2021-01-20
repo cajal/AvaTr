@@ -1,5 +1,6 @@
 import copy
 from typing import Optional, List
+from dotmap import DotMap
 
 import torch
 import torch.nn.functional as F
@@ -36,6 +37,27 @@ class AvaTr(nn.Module):
 
         super().__init__()
 
+        self.model_args = DotMap()
+        # Avatars
+        self.model_args.n_spk = n_spk
+        self.model_args.embed_dim = embed_dim
+        # Transformer
+        self.model_args.d_model = d_model
+        self.model_args.nhead = nhead
+        self.model_args.num_encoder_layers = num_encoder_layers
+        self.model_args.num_decoder_layers = num_decoder_layers
+        self.model_args.dim_feedforward = dim_feedforward
+        self.model_args.dropout = dropout
+        self.model_args.activation = activation
+        self.model_args.normalize_before = normalize_before
+        self.model_args.return_intermediate_dec = return_intermediate_dec
+        # waveform encoder/decoder params
+        self.model_args.kernel_size = kernel_size
+        self.model_args.n_filters = n_filters
+        self.model_args.stride = stride
+        self.model_args.fb_name = fb_name
+        self.model_args.sample_rate = sample_rate
+
         # conv & deconv
         self.conv, self.deconv = make_enc_dec(
             fb_name, kernel_size=kernel_size, n_filters=n_filters, stride=stride,
@@ -59,11 +81,12 @@ class AvaTr(nn.Module):
         # Transformer
         self.tsfm = Transformer(
             d_model=d_model,
-            dropout=dropout,
             nhead=nhead,
-            dim_feedforward=dim_feedforward,
             num_encoder_layers=num_encoder_layers,
             num_decoder_layers=num_decoder_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation=activation,
             normalize_before=normalize_before,
             return_intermediate_dec=return_intermediate_dec,
         )
@@ -100,7 +123,7 @@ class AvaTr(nn.Module):
         mix_mask = self.mask_act(hs)
 
         # masking
-        masked_rep = mix_rep_t * mix_mask 
+        masked_rep = mix_rep_t * mix_mask
 
         # source prediction
         out_wavs = pad_x_to_y(self.deconv(masked_rep), wav)
@@ -109,6 +132,27 @@ class AvaTr(nn.Module):
             out_wavs = out_wavs.squeeze(1)
 
         return out_wavs
+
+    def serialize(self):
+        """Serialize model and args
+
+        Returns:
+            dict, serialized model with keys `model_args` and `state_dict`.
+        """
+        model_conf = dict(
+            model_name=self.__class__.__name__,
+            state_dict=self.get_state_dict(),
+            model_args=self.get_model_args(),
+        )
+        return model_conf
+
+    def get_state_dict(self):
+        """ In case the state dict needs to be modified before sharing the model."""
+        return self.state_dict()
+
+    def get_model_args(self):
+        """return args to re-instantiate the class."""
+        return self.model_args.toDict()
 
 
 class Transformer(nn.Module):
