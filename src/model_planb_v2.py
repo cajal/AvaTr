@@ -133,7 +133,7 @@ class AvaTr(nn.Module):
 
         return out_wavs
 
-    def serialize(self, lr):
+    def serialize(self, scheduler_dict):
         """Serialize model and args
 
         Returns:
@@ -143,7 +143,7 @@ class AvaTr(nn.Module):
             model_name=self.__class__.__name__,
             state_dict=self.get_state_dict(),
             model_args=self.get_model_args(),
-            lr=lr
+            scheduler_dict=scheduler_dict
         )
         return model_conf
 
