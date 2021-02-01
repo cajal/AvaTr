@@ -1,6 +1,8 @@
 import copy
 from typing import Optional, List
 from dotmap import DotMap
+from math import ceil
+import warnings
 
 import torch
 import torch.nn.functional as F
@@ -130,7 +132,7 @@ class AvaTr(nn.Module):
 
         # avatar embedding TODO: B * n_src x C
         query_embed = self.avatar(spk_id) # B x C
-        query_embed = query_embed.unsqueeze(0).repeat(T, 1, 1) # B x C -> T x B x C
+        query_embed = query_embed.unsqueeze(0).repeat(mix_rep_t.shape[-1], 1, 1) # B x C -> T x B x C
 
         # mask generation
         tgt = torch.zeros_like(query_embed)

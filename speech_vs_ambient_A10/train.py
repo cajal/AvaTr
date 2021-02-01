@@ -15,7 +15,7 @@ from asteroid.engine.system import System
 sys.path.append("../")
 
 from src.librimix_dataset import LibriMix
-from src.model_planb_v2 import AvaTr
+from src.model_planb_v4 import AvaTr
 from src.utils import SingleSrcNegSDR
 
 
@@ -83,7 +83,7 @@ def main(conf):
 
     # lr scheduler
     if conf["training"]["lr_scheduler"] == "plateau":
-        scheduler = ReduceLROnPlateau(optimizer=optimizer, factor=0.5, patience=20, verbose=True)
+        scheduler = ReduceLROnPlateau(optimizer=optimizer, factor=0.5, patience=30, verbose=True)
     else:
         scheduler = None
 
